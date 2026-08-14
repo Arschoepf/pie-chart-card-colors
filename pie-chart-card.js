@@ -1,7 +1,7 @@
 import "https://unpkg.com/chart.js@v2.9.3/dist/Chart.bundle.min.js?module";
 
 console.info(
-  `%cPIE-CHART-CARD\n%cVersion: 0.0.4`,
+  `%cPIE-CHART-CARD\n%cVersion: 0.0.5`,
   "color: white; background: olive; font-weight: bold;",
   "color: olive; background: white; font-weight: bold;",
   ""
@@ -103,6 +103,9 @@ class PieChartCard extends HTMLElement {
     
     // If border width does not exist, default to 2
     const borderWidth = config.border_width !== undefined ? Number(config.border_width) : 2;
+    
+    // Determine the border color based on the active theme
+    const borderColor = rootStyles.getPropertyValue('--ha-card-background').trim() || rootStyles.getPropertyValue('--card-background-color').trim() || '#ffffff';
 
     if (config.total_amount){
         const totalEntity =  hass.states[config.total_amount]
@@ -135,13 +138,10 @@ class PieChartCard extends HTMLElement {
           labels: [],
           datasets: [{
             data: [],
-            borderWidth: borderWidth, // <--- Applied the new config option here
-            // Blend the gaps cleanly with the card background based on active theme
-            borderColor: rootStyles.getPropertyValue('--ha-card-background').trim() || rootStyles.getPropertyValue('--card-background-color').trim() || '#ffffff',
             label: 'liveCount',
-    }]
-  },
-       options: {
+          }]
+        },
+        options: {
             responsive: true,
             maintainAspectRatio: false, // https://stackoverflow.com/a/53233861,
             animation: { duration: 0 },
@@ -170,12 +170,14 @@ class PieChartCard extends HTMLElement {
     });
 
   var getData = function() {
-    const dataset = { data: entityData };
+    const dataset = { 
+        data: entityData,
+        backgroundColor: entityColors,
+        borderWidth: borderWidth, // Correctly apply the border width on update
+        borderColor: borderColor // Correctly apply the border color on update
+    };
     
-    // Apply our processed HA theme colors / specific YAML colors
-    dataset.backgroundColor = entityColors;
-    
-    doughnutChart.data =  { datasets: [dataset], labels: entityNames };
+    doughnutChart.data = { datasets: [dataset], labels: entityNames };
     doughnutChart.update();
   };
   getData();
