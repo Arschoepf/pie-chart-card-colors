@@ -1,8 +1,7 @@
 import "https://unpkg.com/chart.js@v2.9.3/dist/Chart.bundle.min.js?module";
-import "https://cdn.jsdelivr.net/npm/chartjs-plugin-colorschemes";
 
 console.info(
-  `%cPIE-CHART-CARD\n%cVersion: 0.0.1`,
+  `%cPIE-CHART-CARD\n%cVersion: 0.0.2`,
   "color: white; background: olive; font-weight: bold;",
   "color: olive; background: white; font-weight: bold;",
   ""
@@ -46,14 +45,32 @@ class PieChartCard extends HTMLElement {
     const content = root.getElementById("content");
     const canvas = root.getElementById("cnv");
     const ctx = canvas.getContext('2d');
+    
+    // Retrieve computed styles to fetch Home Assistant CSS variables
+    const computedStyles = getComputedStyle(this);
+    
+    // Grab the 10 standard HA theme graph colors (with hex fallbacks just in case)
+    const defaultColors = [
+      computedStyles.getPropertyValue('--graph-color-1').trim() || '#326BFF',
+      computedStyles.getPropertyValue('--graph-color-2').trim() || '#E03C31',
+      computedStyles.getPropertyValue('--graph-color-3').trim() || '#379B48',
+      computedStyles.getPropertyValue('--graph-color-4').trim() || '#E1B32A',
+      computedStyles.getPropertyValue('--graph-color-5').trim() || '#A93EE0',
+      computedStyles.getPropertyValue('--graph-color-6').trim() || '#FF9800',
+      computedStyles.getPropertyValue('--graph-color-7').trim() || '#00BCD4',
+      computedStyles.getPropertyValue('--graph-color-8').trim() || '#E91E63',
+      computedStyles.getPropertyValue('--graph-color-9').trim() || '#607D8B',
+      computedStyles.getPropertyValue('--graph-color-10').trim() || '#795548'
+    ];
+
     const hassEntities = config.entities.map(x => hass.states[x.entity]);
     
     // If a name is not provided, use the friendly_name for the entity. If the friendly_name
     // does not exist, use the actual entity.
     var entityNames = config.entities.map(x => x.name !== undefined ? x.name : hass.states[x.entity]["attributes"]["friendly_name"] !== undefined ? hass.states[x.entity]["attributes"]["friendly_name"] : x.entity);
     
-    // Extract color if provided in the configuration
-    var entityColors = config.entities.map(x => x.color !== undefined ? x.color : undefined);
+    // Extract color if provided in the configuration, otherwise map to HA default graph colors
+    var entityColors = config.entities.map((x, i) => x.color !== undefined ? x.color : defaultColors[i % defaultColors.length]);
 
     // If the entity does not exist, default to 0
     var entityData = hassEntities.map(x => x === undefined ? 0 : x.state);
@@ -80,7 +97,7 @@ class PieChartCard extends HTMLElement {
         entityNames.push(config.unknownText ? config.unknownText : 'Unknown');
         
         // Add a fallback color for the unknown portion
-        entityColors.push(config.unknownColor ? config.unknownColor : '#d3d3d3');
+        entityColors.push(config.unknownColor ? config.unknownColor : computedStyles.getPropertyValue('--divider-color').trim() || '#d3d3d3');
     }
 
     const emptyIndexes = entityData.reduce((arr, e, i) => ((e == 0) && arr.push(i), arr), [])
@@ -96,8 +113,9 @@ class PieChartCard extends HTMLElement {
           labels: [],
           datasets: [{
             data: [],
-            borderWidth: 1,
-            borderColor:'#00c0ef',
+            borderWidth: 2,
+            // Automatically blend the slice borders into the card background
+            borderColor: computedStyles.getPropertyValue('--ha-card-background').trim() || '#ffffff',
             label: 'liveCount',
     }]
   },
@@ -110,7 +128,6 @@ class PieChartCard extends HTMLElement {
                 display: legend
              },
             hover: { mode: 'index' },
-            plugins: {colorschemes: { scheme: 'brewer.DarkTwo8' } },
             // https://stackoverflow.com/a/49717859
             tooltips: {
               callbacks: {
@@ -133,11 +150,8 @@ class PieChartCard extends HTMLElement {
   var getData = function() {
     const dataset = { data: entityData };
     
-    // Apply custom colors if any were provided in the configuration
-    // This will override the chartjs-plugin-colorschemes plugin for this chart
-    if (entityColors.some(c => c !== undefined)) {
-        dataset.backgroundColor = entityColors;
-    }
+    // Apply our processed HA theme colors / specific YAML colors
+    dataset.backgroundColor = entityColors;
     
     doughnutChart.data =  { datasets: [dataset], labels: entityNames };
     doughnutChart.update();
