@@ -1,7 +1,7 @@
 import "https://unpkg.com/chart.js@v2.9.3/dist/Chart.bundle.min.js?module";
 
 console.info(
-  `%cPIE-CHART-CARD\n%cVersion: 0.0.3`,
+  `%cPIE-CHART-CARD\n%cVersion: 0.0.4`,
   "color: white; background: olive; font-weight: bold;",
   "color: olive; background: white; font-weight: bold;",
   ""
@@ -100,6 +100,9 @@ class PieChartCard extends HTMLElement {
     
     // If the height does not exist, default to 480px
     content.style.height = config.height != undefined ? config.height : '480px';
+    
+    // If border width does not exist, default to 2
+    const borderWidth = config.border_width !== undefined ? Number(config.border_width) : 2;
 
     if (config.total_amount){
         const totalEntity =  hass.states[config.total_amount]
@@ -132,7 +135,7 @@ class PieChartCard extends HTMLElement {
           labels: [],
           datasets: [{
             data: [],
-            borderWidth: 2,
+            borderWidth: borderWidth, // <--- Applied the new config option here
             // Blend the gaps cleanly with the card background based on active theme
             borderColor: rootStyles.getPropertyValue('--ha-card-background').trim() || rootStyles.getPropertyValue('--card-background-color').trim() || '#ffffff',
             label: 'liveCount',
