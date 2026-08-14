@@ -52,6 +52,9 @@ class PieChartCard extends HTMLElement {
     // does not exist, use the actual entity.
     var entityNames = config.entities.map(x => x.name !== undefined ? x.name : hass.states[x.entity]["attributes"]["friendly_name"] !== undefined ? hass.states[x.entity]["attributes"]["friendly_name"] : x.entity);
     
+    // Extract color if provided in the configuration
+    var entityColors = config.entities.map(x => x.color !== undefined ? x.color : undefined);
+
     // If the entity does not exist, default to 0
     var entityData = hassEntities.map(x => x === undefined ? 0 : x.state);
     card.header = config.title ? config.title : 'Pie Chart';
@@ -73,13 +76,19 @@ class PieChartCard extends HTMLElement {
           console.log("ERROR: config.total_amount must be either an entity or number.")
         }
         const measured = hassEntities.map(x => Number(x.state)).reduce(( accumulator, currentValue ) => accumulator + currentValue,  0);
-        entityData.push(total - measured)
+        entityData.push(total - measured);
         entityNames.push(config.unknownText ? config.unknownText : 'Unknown');
+        
+        // Add a fallback color for the unknown portion
+        entityColors.push(config.unknownColor ? config.unknownColor : '#d3d3d3');
     }
 
     const emptyIndexes = entityData.reduce((arr, e, i) => ((e == 0) && arr.push(i), arr), [])
     entityData = entityData.filter((element, index, array) => !emptyIndexes.includes(index));
     entityNames = entityNames.filter((element, index, array) => !emptyIndexes.includes(index));
+    
+    // Filter out colors associated with empty indexes so the chart aligns correctly
+    entityColors = entityColors.filter((element, index, array) => !emptyIndexes.includes(index));
 
     const doughnutChart = new Chart(ctx, {
         type: 'doughnut',
@@ -122,7 +131,15 @@ class PieChartCard extends HTMLElement {
     });
 
   var getData = function() {
-    doughnutChart.data =  { datasets: [{ data: entityData }], labels: entityNames };
+    const dataset = { data: entityData };
+    
+    // Apply custom colors if any were provided in the configuration
+    // This will override the chartjs-plugin-colorschemes plugin for this chart
+    if (entityColors.some(c => c !== undefined)) {
+        dataset.backgroundColor = entityColors;
+    }
+    
+    doughnutChart.data =  { datasets: [dataset], labels: entityNames };
     doughnutChart.update();
   };
   getData();
