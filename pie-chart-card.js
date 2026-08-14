@@ -1,7 +1,7 @@
 import "https://unpkg.com/chart.js@v2.9.3/dist/Chart.bundle.min.js?module";
 
 console.info(
-  `%cPIE-CHART-CARD\n%cVersion: 0.0.2`,
+  `%cPIE-CHART-CARD\n%cVersion: 0.0.3`,
   "color: white; background: olive; font-weight: bold;",
   "color: olive; background: white; font-weight: bold;",
   ""
@@ -46,21 +46,40 @@ class PieChartCard extends HTMLElement {
     const canvas = root.getElementById("cnv");
     const ctx = canvas.getContext('2d');
     
-    // Retrieve computed styles to fetch Home Assistant CSS variables
-    const computedStyles = getComputedStyle(this);
+    // Grab computed styles from the top-level document so variables resolve correctly
+    const rootStyles = getComputedStyle(document.documentElement);
     
-    // Grab the 10 standard HA theme graph colors (with hex fallbacks just in case)
+    // Helper to translate plain names (e.g., 'deep-purple') into HA's actual theme HEX values
+    const resolveColor = (color) => {
+      if (!color) return undefined;
+      
+      // If the user wrapped the color in var(), extract the exact name
+      if (color.startsWith('var(')) {
+        const varName = color.slice(4, -1).trim();
+        return rootStyles.getPropertyValue(varName).trim() || color;
+      }
+      
+      // Look up common Home Assistant specific color variable formats
+      const haColor = rootStyles.getPropertyValue(`--${color}-color`).trim() || 
+                      rootStyles.getPropertyValue(`--state-${color}-color`).trim() ||
+                      rootStyles.getPropertyValue(`--paper-${color}-500`).trim();
+                      
+      // Return the resolved HA Hex code, or fallback to whatever the user originally typed
+      return haColor || color;
+    };
+    
+    // Standard HA theme graph colors (with hex fallbacks)
     const defaultColors = [
-      computedStyles.getPropertyValue('--graph-color-1').trim() || '#326BFF',
-      computedStyles.getPropertyValue('--graph-color-2').trim() || '#E03C31',
-      computedStyles.getPropertyValue('--graph-color-3').trim() || '#379B48',
-      computedStyles.getPropertyValue('--graph-color-4').trim() || '#E1B32A',
-      computedStyles.getPropertyValue('--graph-color-5').trim() || '#A93EE0',
-      computedStyles.getPropertyValue('--graph-color-6').trim() || '#FF9800',
-      computedStyles.getPropertyValue('--graph-color-7').trim() || '#00BCD4',
-      computedStyles.getPropertyValue('--graph-color-8').trim() || '#E91E63',
-      computedStyles.getPropertyValue('--graph-color-9').trim() || '#607D8B',
-      computedStyles.getPropertyValue('--graph-color-10').trim() || '#795548'
+      rootStyles.getPropertyValue('--graph-color-1').trim() || '#326BFF',
+      rootStyles.getPropertyValue('--graph-color-2').trim() || '#E03C31',
+      rootStyles.getPropertyValue('--graph-color-3').trim() || '#379B48',
+      rootStyles.getPropertyValue('--graph-color-4').trim() || '#E1B32A',
+      rootStyles.getPropertyValue('--graph-color-5').trim() || '#A93EE0',
+      rootStyles.getPropertyValue('--graph-color-6').trim() || '#FF9800',
+      rootStyles.getPropertyValue('--graph-color-7').trim() || '#00BCD4',
+      rootStyles.getPropertyValue('--graph-color-8').trim() || '#E91E63',
+      rootStyles.getPropertyValue('--graph-color-9').trim() || '#607D8B',
+      rootStyles.getPropertyValue('--graph-color-10').trim() || '#795548'
     ];
 
     const hassEntities = config.entities.map(x => hass.states[x.entity]);
@@ -69,8 +88,8 @@ class PieChartCard extends HTMLElement {
     // does not exist, use the actual entity.
     var entityNames = config.entities.map(x => x.name !== undefined ? x.name : hass.states[x.entity]["attributes"]["friendly_name"] !== undefined ? hass.states[x.entity]["attributes"]["friendly_name"] : x.entity);
     
-    // Extract color if provided in the configuration, otherwise map to HA default graph colors
-    var entityColors = config.entities.map((x, i) => x.color !== undefined ? x.color : defaultColors[i % defaultColors.length]);
+    // Apply the resolver to user-configured colors, otherwise fallback to HA default graph colors
+    var entityColors = config.entities.map((x, i) => x.color !== undefined ? resolveColor(x.color) : defaultColors[i % defaultColors.length]);
 
     // If the entity does not exist, default to 0
     var entityData = hassEntities.map(x => x === undefined ? 0 : x.state);
@@ -96,8 +115,8 @@ class PieChartCard extends HTMLElement {
         entityData.push(total - measured);
         entityNames.push(config.unknownText ? config.unknownText : 'Unknown');
         
-        // Add a fallback color for the unknown portion
-        entityColors.push(config.unknownColor ? config.unknownColor : computedStyles.getPropertyValue('--divider-color').trim() || '#d3d3d3');
+        // Add a fallback color for the unknown portion (using standard divider-color)
+        entityColors.push(config.unknownColor ? resolveColor(config.unknownColor) : rootStyles.getPropertyValue('--divider-color').trim() || '#d3d3d3');
     }
 
     const emptyIndexes = entityData.reduce((arr, e, i) => ((e == 0) && arr.push(i), arr), [])
@@ -114,8 +133,8 @@ class PieChartCard extends HTMLElement {
           datasets: [{
             data: [],
             borderWidth: 2,
-            // Automatically blend the slice borders into the card background
-            borderColor: computedStyles.getPropertyValue('--ha-card-background').trim() || '#ffffff',
+            // Blend the gaps cleanly with the card background based on active theme
+            borderColor: rootStyles.getPropertyValue('--ha-card-background').trim() || rootStyles.getPropertyValue('--card-background-color').trim() || '#ffffff',
             label: 'liveCount',
     }]
   },
